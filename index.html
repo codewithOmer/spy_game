@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Spy Heist</title>
+    <title>Spy Heist - Security Room</title>
     <script src="https://unpkg.com/phaser@3/dist/phaser.js"></script>
 </head>
 <body style="margin:0">
@@ -28,10 +28,10 @@ class Game extends Phaser.Scene {
         // Background
         this.add.rectangle(400,300,800,600,0x2d2d2d);
 
-        // SAFE PLAYER SPAWN
-        this.player = this.add.image(200,200,'player').setScale(0.5);
+        // 🧍 PLAYER (Lobby spawn)
+        this.player = this.add.image(120,480,'player').setScale(0.5);
 
-        // Controls
+        //  Controls
         this.keys = this.input.keyboard.addKeys({
             up: Phaser.Input.Keyboard.KeyCodes.UP,
             down: Phaser.Input.Keyboard.KeyCodes.DOWN,
@@ -43,30 +43,56 @@ class Game extends Phaser.Scene {
             D: Phaser.Input.Keyboard.KeyCodes.D
         });
 
-        // SAFE SERVER POSITION
-        this.server = this.add.image(650,450,'server').setScale(0.8);
+        //  SECURITY ROOM OBJECTIVE (bottom center)
+        this.server = this.add.image(400,520,'server').setScale(0.7);
 
-        // Walls
+        //  WALLS (MAP)
         this.walls = [
-            this.add.rectangle(400,100,600,40,0x888888),
-            this.add.rectangle(400,500,600,40,0x888888),
-            this.add.rectangle(100,300,40,400,0x888888),
-            this.add.rectangle(700,300,40,400,0x888888),
-            this.add.rectangle(400,300,300,40,0x888888)
+
+            // Outer walls
+            this.add.rectangle(400,20,760,40,0x888888),
+            this.add.rectangle(400,580,760,40,0x888888),
+            this.add.rectangle(20,300,40,560,0x888888),
+            this.add.rectangle(780,300,40,560,0x888888),
+
+            // Top rooms dividers
+            this.add.rectangle(300,140,40,200,0x888888),
+            this.add.rectangle(500,140,40,200,0x888888),
+
+            // Hallway divider
+            this.add.rectangle(400,250,600,40,0x888888),
+
+            // Room 4 right wall
+            this.add.rectangle(600,400,40,300,0x888888),
+
+            // Lobby divider (left bottom)
+            this.add.rectangle(250,400,40,300,0x888888),
+
+            // Security room walls (bottom center box)
+            this.add.rectangle(400,450,300,40,0x888888), // top
+            this.add.rectangle(250,520,40,120,0x888888), // left
+            this.add.rectangle(550,520,40,120,0x888888)  // right
         ];
 
-        // Hide spots
+        //  DOOR GAPS (visual only)
+        this.add.rectangle(200,250,60,20,0x00ff00); // lobby → hall
+        this.add.rectangle(400,250,60,20,0x00ff00); // hall center
+        this.add.rectangle(600,250,60,20,0x00ff00); // hall → room 4
+        this.add.rectangle(400,450,80,20,0x00ff00); // security room entrance
+
+        //  Hiding spots
         this.hideSpots = [
-            this.add.rectangle(200,350,60,60,0xaa7744),
-            this.add.rectangle(600,250,60,60,0xaa7744)
+            this.add.rectangle(180,500,60,60,0xaa7744),
+            this.add.rectangle(650,420,60,60,0xaa7744),
+            this.add.rectangle(600,120,60,60,0xaa7744)
         ];
 
-        // Guards
+        //  Guards
         this.guards = [];
         for(let i=0;i<3;i++){
             let g = this.add.image(
-                Phaser.Math.Between(200,600),
-                Phaser.Math.Between(150,450),
+                Phaser.Math.Between(200,650),
+                Phaser.Math.Between(100,450),
                 'guard'
             ).setScale(0.6);
 
@@ -92,9 +118,9 @@ class Game extends Phaser.Scene {
         if(this.keys.up.isDown || this.keys.W.isDown) this.player.y -= 3;
         if(this.keys.down.isDown || this.keys.S.isDown) this.player.y += 3;
 
-        // KEEP PLAYER INSIDE SAFE AREA
-        this.player.x = Phaser.Math.Clamp(this.player.x, 130, 670);
-        this.player.y = Phaser.Math.Clamp(this.player.y, 130, 470);
+        // Stay in bounds
+        this.player.x = Phaser.Math.Clamp(this.player.x, 40, 760);
+        this.player.y = Phaser.Math.Clamp(this.player.y, 40, 560);
 
         // Wall collision
         this.walls.forEach(w=>{
@@ -129,8 +155,8 @@ class Game extends Phaser.Scene {
             g.x += g.speedX;
             g.y += g.speedY;
 
-            if(g.x<150||g.x>650) g.speedX*=-1;
-            if(g.y<150||g.y>450) g.speedY*=-1;
+            if(g.x<100||g.x>700) g.speedX*=-1;
+            if(g.y<100||g.y>500) g.speedY*=-1;
 
             let dist = Phaser.Math.Distance.Between(
                 this.player.x,this.player.y,g.x,g.y
@@ -141,7 +167,7 @@ class Game extends Phaser.Scene {
             }
         });
 
-        // Suspicion
+        // Suspicion system
         this.suspicion -= 0.1;
         this.suspicion = Phaser.Math.Clamp(this.suspicion,0,100);
         this.bar.width = this.suspicion * 2;
@@ -151,14 +177,14 @@ class Game extends Phaser.Scene {
             location.reload();
         }
 
-        // Reach server
+        // Reach Security Room Server
         let d = Phaser.Math.Distance.Between(
             this.player.x,this.player.y,
             this.server.x,this.server.y
         );
 
         if(d < 50){
-            alert("MISSION COMPLETE!");
+            alert("SECURITY HACKED! MISSION COMPLETE");
             location.reload();
         }
     }

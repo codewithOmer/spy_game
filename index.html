@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Spy Heist - Security Room</title>
+    <title>Spy Heist - Final</title>
     <script src="https://unpkg.com/phaser@3/dist/phaser.js"></script>
 </head>
 <body style="margin:0">
@@ -28,10 +28,10 @@ class Game extends Phaser.Scene {
         // Background
         this.add.rectangle(400,300,800,600,0x2d2d2d);
 
-        // 🧍 PLAYER (Lobby spawn)
+        // PLAYER (Lobby)
         this.player = this.add.image(120,480,'player').setScale(0.5);
 
-        //  Controls
+        // Controls
         this.keys = this.input.keyboard.addKeys({
             up: Phaser.Input.Keyboard.KeyCodes.UP,
             down: Phaser.Input.Keyboard.KeyCodes.DOWN,
@@ -43,10 +43,10 @@ class Game extends Phaser.Scene {
             D: Phaser.Input.Keyboard.KeyCodes.D
         });
 
-        //  SECURITY ROOM OBJECTIVE (bottom center)
+        // SECURITY ROOM SERVER
         this.server = this.add.image(400,520,'server').setScale(0.7);
 
-        //  WALLS (MAP)
+        // WALLS (WITH REAL DOOR GAPS)
         this.walls = [
 
             // Outer walls
@@ -55,39 +55,42 @@ class Game extends Phaser.Scene {
             this.add.rectangle(20,300,40,560,0x888888),
             this.add.rectangle(780,300,40,560,0x888888),
 
-            // Top rooms dividers
+            // Top room dividers
             this.add.rectangle(300,140,40,200,0x888888),
             this.add.rectangle(500,140,40,200,0x888888),
 
-            // Hallway divider
-            this.add.rectangle(400,250,600,40,0x888888),
+            // HALLWAY WALL WITH GAPS
+            this.add.rectangle(150,250,200,40,0x888888),
+            this.add.rectangle(400,250,200,40,0x888888),
+            this.add.rectangle(650,250,200,40,0x888888),
 
-            // Room 4 right wall
+            // Room 4 divider
             this.add.rectangle(600,400,40,300,0x888888),
 
-            // Lobby divider (left bottom)
+            // Lobby divider
             this.add.rectangle(250,400,40,300,0x888888),
 
-            // Security room walls (bottom center box)
-            this.add.rectangle(400,450,300,40,0x888888), // top
-            this.add.rectangle(250,520,40,120,0x888888), // left
-            this.add.rectangle(550,520,40,120,0x888888)  // right
+            // SECURITY ROOM (WITH DOOR GAP)
+            this.add.rectangle(300,450,150,40,0x888888),
+            this.add.rectangle(500,450,150,40,0x888888),
+            this.add.rectangle(250,520,40,120,0x888888),
+            this.add.rectangle(550,520,40,120,0x888888)
         ];
 
-        //  DOOR GAPS (visual only)
-        this.add.rectangle(200,250,60,20,0x00ff00); // lobby → hall
-        this.add.rectangle(400,250,60,20,0x00ff00); // hall center
-        this.add.rectangle(600,250,60,20,0x00ff00); // hall → room 4
-        this.add.rectangle(400,450,80,20,0x00ff00); // security room entrance
+        // DOOR VISUALS (optional)
+        this.add.rectangle(200,250,60,20,0x00ff00);
+        this.add.rectangle(400,250,60,20,0x00ff00);
+        this.add.rectangle(600,250,60,20,0x00ff00);
+        this.add.rectangle(400,450,80,20,0x00ff00);
 
-        //  Hiding spots
+        // Hide spots
         this.hideSpots = [
             this.add.rectangle(180,500,60,60,0xaa7744),
             this.add.rectangle(650,420,60,60,0xaa7744),
             this.add.rectangle(600,120,60,60,0xaa7744)
         ];
 
-        //  Guards
+        // Guards
         this.guards = [];
         for(let i=0;i<3;i++){
             let g = this.add.image(
@@ -118,7 +121,7 @@ class Game extends Phaser.Scene {
         if(this.keys.up.isDown || this.keys.W.isDown) this.player.y -= 3;
         if(this.keys.down.isDown || this.keys.S.isDown) this.player.y += 3;
 
-        // Stay in bounds
+        // Stay inside map
         this.player.x = Phaser.Math.Clamp(this.player.x, 40, 760);
         this.player.y = Phaser.Math.Clamp(this.player.y, 40, 560);
 
@@ -177,7 +180,7 @@ class Game extends Phaser.Scene {
             location.reload();
         }
 
-        // Reach Security Room Server
+        // Win condition (security room)
         let d = Phaser.Math.Distance.Between(
             this.player.x,this.player.y,
             this.server.x,this.server.y

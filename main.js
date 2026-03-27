@@ -1,264 +1,285 @@
+window.onload = function () {
 
+//////////////////// CONFIG ////////////////////
 const config = {
     type: Phaser.AUTO,
     width: 800,
     height: 600,
-    scene: [MenuScene, GameScene, HackScene, GameOverScene]
+    scene: [MenuScene, GameScene, HackScene, WinScene, GameOverScene]
 };
 
-const game = new Phaser.Game(config);
+//////////////////// MENU ////////////////////
+class MenuScene extends Phaser.Scene {
+    constructor() { super("MenuScene"); }
 
-// ---------------- MENU ----------------
-function MenuScene() {
-    Phaser.Scene.call(this, { key: 'MenuScene' });
+    create() {
+        this.cameras.main.setBackgroundColor("#000022");
+
+        this.add.text(250, 180, "SPY HEIST", {
+            fontSize: "48px",
+            color: "#00ffff",
+            fontFamily: "monospace"
+        });
+
+        let btn = this.add.text(330, 300, "START", {
+            fontSize: "28px",
+            backgroundColor: "#00ffcc",
+            color: "#000"
+        }).setPadding(10).setInteractive();
+
+        btn.on("pointerover", () => btn.setScale(1.1));
+        btn.on("pointerout", () => btn.setScale(1));
+
+        btn.on("pointerdown", () => this.scene.start("GameScene"));
+    }
 }
-MenuScene.prototype = Object.create(Phaser.Scene.prototype);
 
-MenuScene.prototype.create = function () {
-    this.cameras.main.setBackgroundColor("#000022");
+//////////////////// GAME ////////////////////
+class GameScene extends Phaser.Scene {
+    constructor() { super("GameScene"); }
 
-    this.add.text(260, 200, "SPY HEIST", { fontSize: "42px", color: "#00ffff" });
-
-    let startBtn = this.add.text(330, 300, "START", {
-        fontSize: "30px",
-        backgroundColor: "#00ffcc",
-        color: "#000"
-    }).setPadding(10).setInteractive();
-
-    startBtn.on("pointerdown", () => {
-        this.scene.start("GameScene");
-    });
-};
-
-// ---------------- GAME ----------------
-function GameScene() {
-    Phaser.Scene.call(this, { key: 'GameScene' });
-}
-GameScene.prototype = Object.create(Phaser.Scene.prototype);
-
-let player, cursors, guards = [], suspicion = 0, bar;
-let hideSpots = [], walls = [];
-
-GameScene.prototype.preload = function () {
-    // FREE assets (online)
-    this.load.image('player', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
-    this.load.image('guard', 'https://labs.phaser.io/assets/sprites/robot.png');
-    this.load.image('box', 'https://labs.phaser.io/assets/sprites/crate.png');
-    this.load.image('wall', 'https://labs.phaser.io/assets/sprites/block.png');
-    this.load.image('server', 'https://labs.phaser.io/assets/sprites/computer.png');
-};
-
-GameScene.prototype.create = function () {
-
-    this.cameras.main.setBackgroundColor("#111111");
-
-    // Player
-    player = this.add.image(100, 100, 'player').setScale(0.5);
-
-    cursors = this.input.keyboard.createCursorKeys();
-
-    // Walls
-    walls = [
-        this.add.image(300, 200, 'wall').setScale(2),
-        this.add.image(500, 400, 'wall').setScale(2),
-        this.add.image(150, 400, 'wall').setScale(2)
-    ];
-
-    // Hide spots
-    hideSpots = [
-        this.add.image(200, 300, 'box').setScale(0.7),
-        this.add.image(600, 200, 'box').setScale(0.7)
-    ];
-
-    // Server
-    this.server = this.add.image(750, 550, 'server').setScale(0.6);
-
-    // Guards
-    guards = [];
-    for (let i = 0; i < 3; i++) {
-        let g = this.add.image(
-            Phaser.Math.Between(100, 700),
-            Phaser.Math.Between(100, 500),
-            'guard'
-        ).setScale(0.5);
-
-        g.speedX = Phaser.Math.Between(-2, 2) || 1;
-        g.speedY = Phaser.Math.Between(-2, 2) || 1;
-
-        g.seeCount = 0;
-        g.chasing = false;
-
-        guards.push(g);
+    preload() {
+        this.load.image('player', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
+        this.load.image('guard', 'https://labs.phaser.io/assets/sprites/robot.png');
+        this.load.image('server', 'https://labs.phaser.io/assets/sprites/computer.png');
     }
 
-    // Suspicion bar
-    bar = this.add.rectangle(100, 50, 200, 20, 0xffff00);
-};
+    create() {
+        // Floor
+        this.add.rectangle(400, 300, 800, 600, 0x1a1a1a);
 
-GameScene.prototype.update = function () {
+        this.player = this.add.image(100, 100, 'player').setScale(0.5);
+        this.cursors = this.input.keyboard.createCursorKeys();
 
-    let prevX = player.x;
-    let prevY = player.y;
+        this.suspicion = 0;
+        this.bar = this.add.rectangle(100, 50, 200, 20, 0xffff00);
 
-    // Player movement
-    if (cursors.left.isDown) player.x -= 3;
-    if (cursors.right.isDown) player.x += 3;
-    if (cursors.up.isDown) player.y -= 3;
-    if (cursors.down.isDown) player.y += 3;
+        // WALLS (structured layout)
+        this.walls = [
+            this.add.rectangle(400, 100, 600, 40, 0x444444),
+            this.add.rectangle(400, 500, 600, 40, 0x444444),
+            this.add.rectangle(100, 300, 40, 400, 0x444444),
+            this.add.rectangle(700, 300, 40, 400, 0x444444),
+            this.add.rectangle(400, 300, 300, 40, 0x444444)
+        ];
 
-    // Wall collision (player)
-    walls.forEach(w => {
-        if (Phaser.Geom.Intersects.RectangleToRectangle(player.getBounds(), w.getBounds())) {
-            player.x = prevX;
-            player.y = prevY;
+        // Hide spots
+        this.hideSpots = [
+            this.add.rectangle(200, 300, 50, 50, 0x8b5a2b),
+            this.add.rectangle(600, 200, 50, 50, 0x8b5a2b)
+        ];
+
+        this.server = this.add.image(750, 550, 'server');
+
+        this.guards = [];
+
+        for (let i = 0; i < 3; i++) {
+            let g = this.add.image(
+                Phaser.Math.Between(150, 650),
+                Phaser.Math.Between(150, 450),
+                'guard'
+            ).setScale(0.5);
+
+            g.state = "patrol";
+            g.speedX = Phaser.Math.Between(-2, 2) || 1;
+            g.speedY = Phaser.Math.Between(-2, 2) || 1;
+            g.seeCount = 0;
+
+            g.vision = this.add.graphics();
+
+            this.guards.push(g);
         }
-    });
+    }
 
-    // Hiding
-    let isHidden = false;
-    hideSpots.forEach(h => {
-        let dist = Phaser.Math.Distance.Between(player.x, player.y, h.x, h.y);
-        if (dist < 60) isHidden = true;
-    });
+    update() {
+        let prevX = this.player.x;
+        let prevY = this.player.y;
 
-    guards.forEach(g => {
+        // Movement
+        if (this.cursors.left.isDown) this.player.x -= 3;
+        if (this.cursors.right.isDown) this.player.x += 3;
+        if (this.cursors.up.isDown) this.player.y -= 3;
+        if (this.cursors.down.isDown) this.player.y += 3;
 
-        let prevGX = g.x;
-        let prevGY = g.y;
+        // Wall collision
+        this.walls.forEach(w => {
+            let rect = new Phaser.Geom.Rectangle(
+                w.x - w.width/2,
+                w.y - w.height/2,
+                w.width,
+                w.height
+            );
 
-        let dx = player.x - g.x;
-        let dy = player.y - g.y;
-        let dist = Phaser.Math.Distance.Between(player.x, player.y, g.x, g.y);
+            if (Phaser.Geom.Intersects.RectangleToRectangle(
+                this.player.getBounds(),
+                rect
+            )) {
+                this.player.x = prevX;
+                this.player.y = prevY;
+            }
+        });
 
-        let angleToPlayer = Math.atan2(dy, dx);
-        let moveAngle = Math.atan2(g.speedY, g.speedX);
-        let angleDiff = Phaser.Math.Angle.Wrap(angleToPlayer - moveAngle);
+        // Hiding
+        let isHidden = false;
+        this.hideSpots.forEach(h => {
+            if (Phaser.Math.Distance.Between(this.player.x, this.player.y, h.x, h.y) < 60) {
+                isHidden = true;
+            }
+        });
 
-        let inCone = Math.abs(angleDiff) < 0.6 && dist < 180;
+        // Guards AI
+        this.guards.forEach(g => {
+            g.vision.clear();
 
-        if (inCone && !isHidden) {
-            g.seeCount++;
+            let dx = this.player.x - g.x;
+            let dy = this.player.y - g.y;
+            let dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, g.x, g.y);
+            let angle = Math.atan2(dy, dx);
 
-            if (g.seeCount >= 5) {
-                g.chasing = true;
+            // Vision cone
+            g.vision.fillStyle(0xff0000, 0.08);
+            g.vision.beginPath();
+            g.vision.moveTo(g.x, g.y);
+            g.vision.arc(g.x, g.y, 180, angle - 0.5, angle + 0.5);
+            g.vision.closePath();
+            g.vision.fillPath();
+
+            if (dist < 180 && !isHidden) {
+                g.seeCount++;
+
+                if (g.seeCount > 3) g.state = "alert";
+                if (g.seeCount > 6) g.state = "chase";
+
+                this.suspicion += 0.5;
             }
 
-            suspicion += 0.4;
-        }
+            if (g.state === "patrol") {
+                g.x += g.speedX;
+                g.y += g.speedY;
+            }
 
-        if (g.chasing) {
-            let angle = Math.atan2(player.y - g.y, player.x - g.x);
-            g.x += Math.cos(angle) * 2.5;
-            g.y += Math.sin(angle) * 2.5;
-        } else {
-            g.x += g.speedX;
-            g.y += g.speedY;
+            if (g.state === "alert") {
+                g.x += dx * 0.01;
+                g.y += dy * 0.01;
+            }
+
+            if (g.state === "chase") {
+                g.x += Math.cos(angle) * 2.5;
+                g.y += Math.sin(angle) * 2.5;
+            }
 
             if (g.x < 0 || g.x > 800) g.speedX *= -1;
             if (g.y < 0 || g.y > 600) g.speedY *= -1;
+        });
+
+        // Suspicion system
+        this.suspicion -= 0.1;
+        this.suspicion = Phaser.Math.Clamp(this.suspicion, 0, 100);
+        this.bar.width = this.suspicion * 2;
+
+        if (this.suspicion >= 100) {
+            this.scene.start("GameOverScene");
         }
 
-        // Wall collision (guards)
-        walls.forEach(w => {
-            if (Phaser.Geom.Intersects.RectangleToRectangle(g.getBounds(), w.getBounds())) {
-                g.x = prevGX;
-                g.y = prevGY;
-                g.speedX *= -1;
-                g.speedY *= -1;
-            }
-        });
-    });
-
-    // Suspicion
-    suspicion -= 0.1;
-    suspicion = Phaser.Math.Clamp(suspicion, 0, 100);
-
-    bar.width = suspicion * 2;
-
-    if (suspicion >= 100) {
-        this.scene.start("GameOverScene");
+        // Reach server
+        if (Phaser.Math.Distance.Between(
+            this.player.x, this.player.y,
+            this.server.x, this.server.y
+        ) < 50) {
+            this.scene.start("HackScene");
+        }
     }
-
-    // Reach server
-    let distToServer = Phaser.Math.Distance.Between(player.x, player.y, this.server.x, this.server.y);
-
-    if (distToServer < 50) {
-        this.scene.start("HackScene");
-    }
-};
-
-// ---------------- HACK ----------------
-function HackScene() {
-    Phaser.Scene.call(this, { key: 'HackScene' });
 }
-HackScene.prototype = Object.create(Phaser.Scene.prototype);
 
-let sequence = [], playerInput = [], buttons = [];
+//////////////////// HACK ////////////////////
+class HackScene extends Phaser.Scene {
+    constructor() { super("HackScene"); }
 
-HackScene.prototype.create = function () {
+    create() {
+        this.cameras.main.setBackgroundColor("#001111");
 
-    this.cameras.main.setBackgroundColor("#001111");
-
-    this.add.text(240, 100, "HACK TERMINAL", { fontSize: "30px", color: "#00ffff" });
-
-    sequence = [];
-    playerInput = [];
-
-    for (let i = 0; i < 4; i++) {
-        sequence.push(Phaser.Math.Between(0, 2));
-    }
-
-    buttons = [];
-
-    for (let i = 0; i < 3; i++) {
-        let btn = this.add.rectangle(250 + i * 120, 300, 90, 90, 0x00ffcc)
-            .setInteractive();
-
-        btn.id = i;
-
-        btn.on("pointerdown", () => {
-            playerInput.push(btn.id);
-
-            if (playerInput[playerInput.length - 1] !== sequence[playerInput.length - 1]) {
-                this.scene.start("GameOverScene");
-            }
-
-            if (playerInput.length === sequence.length) {
-                this.add.text(260, 450, "ACCESS GRANTED", {
-                    fontSize: "28px",
-                    color: "#00ff00"
-                });
-
-                this.time.delayedCall(1500, () => {
-                    this.scene.start("MenuScene");
-                });
-            }
+        this.add.text(240, 100, "HACK TERMINAL", {
+            fontSize: "30px",
+            color: "#00ffff"
         });
 
-        buttons.push(btn);
+        this.sequence = [];
+        this.inputSeq = [];
+
+        for (let i = 0; i < 4; i++) {
+            this.sequence.push(Phaser.Math.Between(0, 2));
+        }
+
+        for (let i = 0; i < 3; i++) {
+            let btn = this.add.rectangle(250 + i * 120, 300, 90, 90, 0x00ffcc)
+                .setInteractive();
+
+            btn.id = i;
+
+            btn.on("pointerdown", () => {
+                this.inputSeq.push(btn.id);
+
+                if (this.inputSeq[this.inputSeq.length - 1] !== this.sequence[this.inputSeq.length - 1]) {
+                    this.scene.start("GameOverScene");
+                }
+
+                if (this.inputSeq.length === this.sequence.length) {
+                    this.scene.start("WinScene");
+                }
+            });
+        }
+
+        this.time.delayedCall(6000, () => {
+            this.scene.start("GameOverScene");
+        });
     }
-};
-
-// ---------------- GAME OVER ----------------
-function GameOverScene() {
-    Phaser.Scene.call(this, { key: 'GameOverScene' });
 }
-GameOverScene.prototype = Object.create(Phaser.Scene.prototype);
 
-GameOverScene.prototype.create = function () {
+//////////////////// WIN ////////////////////
+class WinScene extends Phaser.Scene {
+    constructor() { super("WinScene"); }
 
-    this.cameras.main.setBackgroundColor("#220000");
+    create() {
+        this.cameras.main.setBackgroundColor("#002200");
 
-    this.add.text(300, 250, "CAUGHT!", { fontSize: "40px", color: "#ff0000" });
+        this.add.text(240, 250, "MISSION COMPLETE", {
+            fontSize: "36px",
+            color: "#00ff00"
+        });
 
-    let restart = this.add.text(320, 320, "RESTART", {
-        fontSize: "30px",
-        backgroundColor: "#ffffff",
-        color: "#000"
-    }).setPadding(10).setInteractive();
+        let btn = this.add.text(320, 320, "MENU", {
+            fontSize: "28px",
+            backgroundColor: "#fff",
+            color: "#000"
+        }).setPadding(10).setInteractive();
 
-    restart.on("pointerdown", () => {
-        suspicion = 0;
-        this.scene.start("GameScene");
-    });
+        btn.on("pointerdown", () => this.scene.start("MenuScene"));
+    }
+}
+
+//////////////////// GAME OVER ////////////////////
+class GameOverScene extends Phaser.Scene {
+    constructor() { super("GameOverScene"); }
+
+    create() {
+        this.cameras.main.setBackgroundColor("#220000");
+
+        this.add.text(300, 250, "CAUGHT!", {
+            fontSize: "40px",
+            color: "#ff0000"
+        });
+
+        let btn = this.add.text(320, 320, "RESTART", {
+            fontSize: "28px",
+            backgroundColor: "#fff",
+            color: "#000"
+        }).setPadding(10).setInteractive();
+
+        btn.on("pointerdown", () => this.scene.start("GameScene"));
+    }
+}
+
+//////////////////// START ////////////////////
+new Phaser.Game(config);
+
 };

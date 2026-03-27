@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Spy Heist - Final</title>
+    <title>Spy Heist - Ultimate Map</title>
     <script src="https://unpkg.com/phaser@3/dist/phaser.js"></script>
 </head>
 <body style="margin:0">
@@ -28,7 +28,7 @@ class Game extends Phaser.Scene {
         // Background
         this.add.rectangle(400,300,800,600,0x2d2d2d);
 
-        // PLAYER (Lobby)
+        // PLAYER
         this.player = this.add.image(120,480,'player').setScale(0.5);
 
         // Controls
@@ -43,10 +43,10 @@ class Game extends Phaser.Scene {
             D: Phaser.Input.Keyboard.KeyCodes.D
         });
 
-        // SECURITY ROOM SERVER
+        // SERVER (Security Room)
         this.server = this.add.image(400,520,'server').setScale(0.7);
 
-        // WALLS (WITH REAL DOOR GAPS)
+        //  WALLS (ALL WITH REAL GAPS)
         this.walls = [
 
             // Outer walls
@@ -55,14 +55,18 @@ class Game extends Phaser.Scene {
             this.add.rectangle(20,300,40,560,0x888888),
             this.add.rectangle(780,300,40,560,0x888888),
 
-            // Top room dividers
-            this.add.rectangle(300,140,40,200,0x888888),
-            this.add.rectangle(500,140,40,200,0x888888),
+            //TOP DIVIDERS WITH VERTICAL DOORS
+            this.add.rectangle(300,80,40,80,0x888888),
+            this.add.rectangle(300,200,40,80,0x888888),
 
-            // HALLWAY WALL WITH GAPS
-            this.add.rectangle(150,250,200,40,0x888888),
-            this.add.rectangle(400,250,200,40,0x888888),
-            this.add.rectangle(650,250,200,40,0x888888),
+            this.add.rectangle(500,80,40,80,0x888888),
+            this.add.rectangle(500,200,40,80,0x888888),
+
+            // HALLWAY WALL WITH 3 DOORS
+            this.add.rectangle(100,250,160,40,0x888888),
+            this.add.rectangle(300,250,120,40,0x888888),
+            this.add.rectangle(500,250,120,40,0x888888),
+            this.add.rectangle(700,250,160,40,0x888888),
 
             // Room 4 divider
             this.add.rectangle(600,400,40,300,0x888888),
@@ -70,18 +74,26 @@ class Game extends Phaser.Scene {
             // Lobby divider
             this.add.rectangle(250,400,40,300,0x888888),
 
-            // SECURITY ROOM (WITH DOOR GAP)
+            // SECURITY ROOM WITH DOOR
             this.add.rectangle(300,450,150,40,0x888888),
             this.add.rectangle(500,450,150,40,0x888888),
             this.add.rectangle(250,520,40,120,0x888888),
             this.add.rectangle(550,520,40,120,0x888888)
         ];
 
-        // DOOR VISUALS (optional)
-        this.add.rectangle(200,250,60,20,0x00ff00);
-        this.add.rectangle(400,250,60,20,0x00ff00);
-        this.add.rectangle(600,250,60,20,0x00ff00);
+        // DOOR VISUALS (ALL 6 DOORS)
+
+        // Horizontal hallway doors
+        this.add.rectangle(200,250,70,20,0x00ff00);
+        this.add.rectangle(400,250,70,20,0x00ff00);
+        this.add.rectangle(600,250,70,20,0x00ff00);
+
+        // Security room door
         this.add.rectangle(400,450,80,20,0x00ff00);
+
+        // NEW vertical doors (your white marks)
+        this.add.rectangle(300,140,20,60,0x00ff00);
+        this.add.rectangle(500,140,20,60,0x00ff00);
 
         // Hide spots
         this.hideSpots = [
@@ -125,7 +137,7 @@ class Game extends Phaser.Scene {
         this.player.x = Phaser.Math.Clamp(this.player.x, 40, 760);
         this.player.y = Phaser.Math.Clamp(this.player.y, 40, 560);
 
-        // Wall collision
+        // Collision
         this.walls.forEach(w=>{
             let rect = new Phaser.Geom.Rectangle(
                 w.x-w.width/2,
@@ -180,7 +192,7 @@ class Game extends Phaser.Scene {
             location.reload();
         }
 
-        // Win condition (security room)
+        // Win condition
         let d = Phaser.Math.Distance.Between(
             this.player.x,this.player.y,
             this.server.x,this.server.y

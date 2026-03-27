@@ -1,11 +1,8 @@
 
-
-
 const config = {
     type: Phaser.AUTO,
     width: 800,
     height: 600,
-    audio: { disableWebAudio: false },
     scene: [MenuScene, GameScene, HackScene, GameOverScene]
 };
 
@@ -40,56 +37,68 @@ function GameScene() {
 GameScene.prototype = Object.create(Phaser.Scene.prototype);
 
 let player, cursors, guards = [], suspicion = 0, bar;
-let hideSpots = [], alarmSound, alarmTriggered = false;
+let hideSpots = [], walls = [];
+
+GameScene.prototype.preload = function () {
+    // FREE assets (online)
+    this.load.image('player', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
+    this.load.image('guard', 'https://labs.phaser.io/assets/sprites/robot.png');
+    this.load.image('box', 'https://labs.phaser.io/assets/sprites/crate.png');
+    this.load.image('wall', 'https://labs.phaser.io/assets/sprites/block.png');
+    this.load.image('server', 'https://labs.phaser.io/assets/sprites/computer.png');
+};
 
 GameScene.prototype.create = function () {
 
     this.cameras.main.setBackgroundColor("#111111");
 
-    // Player (cyan)
-    player = this.add.rectangle(100, 100, 30, 30, 0x00ffff);
+    // Player
+    player = this.add.image(100, 100, 'player').setScale(0.5);
 
     cursors = this.input.keyboard.createCursorKeys();
 
-    // Hide spots (gray crates)
-    hideSpots = [
-        this.add.rectangle(200, 200, 70, 70, 0x666666),
-        this.add.rectangle(500, 350, 70, 70, 0x666666)
+    // Walls
+    walls = [
+        this.add.image(300, 200, 'wall').setScale(2),
+        this.add.image(500, 400, 'wall').setScale(2),
+        this.add.image(150, 400, 'wall').setScale(2)
     ];
 
-    // Server zone (goal)
-    this.add.rectangle(750, 550, 80, 80, 0x0000ff);
-    this.add.text(690, 520, "SERVER", { fontSize: "14px", color: "#ffffff" });
+    // Hide spots
+    hideSpots = [
+        this.add.image(200, 300, 'box').setScale(0.7),
+        this.add.image(600, 200, 'box').setScale(0.7)
+    ];
+
+    // Server
+    this.server = this.add.image(750, 550, 'server').setScale(0.6);
 
     // Guards
     guards = [];
     for (let i = 0; i < 3; i++) {
-        let g = this.add.rectangle(
+        let g = this.add.image(
             Phaser.Math.Between(100, 700),
             Phaser.Math.Between(100, 500),
-            30, 30, 0xff4444
-        );
+            'guard'
+        ).setScale(0.5);
 
         g.speedX = Phaser.Math.Between(-2, 2) || 1;
         g.speedY = Phaser.Math.Between(-2, 2) || 1;
+
+        g.seeCount = 0;
         g.chasing = false;
 
         guards.push(g);
     }
 
-    // Suspicion bar (yellow → red feel)
+    // Suspicion bar
     bar = this.add.rectangle(100, 50, 200, 20, 0xffff00);
-
-    // Alarm sound (free online)
-    this.load.audio('alarm', 'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg');
-    this.load.start();
-
-    this.load.on('complete', () => {
-        alarmSound = this.sound.add('alarm', { loop: true, volume: 0.3 });
-    });
 };
 
 GameScene.prototype.update = function () {
+
+    let prevX = player.x;
+    let prevY = player.y;
 
     // Player movement
     if (cursors.left.isDown) player.x -= 3;
@@ -97,7 +106,15 @@ GameScene.prototype.update = function () {
     if (cursors.up.isDown) player.y -= 3;
     if (cursors.down.isDown) player.y += 3;
 
-    // Check hiding
+    // Wall collision (player)
+    walls.forEach(w => {
+        if (Phaser.Geom.Intersects.RectangleToRectangle(player.getBounds(), w.getBounds())) {
+            player.x = prevX;
+            player.y = prevY;
+        }
+    });
+
+    // Hiding
     let isHidden = false;
     hideSpots.forEach(h => {
         let dist = Phaser.Math.Distance.Between(player.x, player.y, h.x, h.y);
@@ -105,6 +122,9 @@ GameScene.prototype.update = function () {
     });
 
     guards.forEach(g => {
+
+        let prevGX = g.x;
+        let prevGY = g.y;
 
         let dx = player.x - g.x;
         let dy = player.y - g.y;
@@ -116,63 +136,53 @@ GameScene.prototype.update = function () {
 
         let inCone = Math.abs(angleDiff) < 0.6 && dist < 180;
 
-        // DETECTION
         if (inCone && !isHidden) {
-            suspicion += 0.6;
-            g.chasing = true;
+            g.seeCount++;
+
+            if (g.seeCount >= 5) {
+                g.chasing = true;
+            }
+
+            suspicion += 0.4;
         }
 
-        // CHASING BEHAVIOR
         if (g.chasing) {
             let angle = Math.atan2(player.y - g.y, player.x - g.x);
             g.x += Math.cos(angle) * 2.5;
             g.y += Math.sin(angle) * 2.5;
         } else {
-            // Normal random movement
             g.x += g.speedX;
             g.y += g.speedY;
 
             if (g.x < 0 || g.x > 800) g.speedX *= -1;
             if (g.y < 0 || g.y > 600) g.speedY *= -1;
-
-            if (Phaser.Math.Between(0, 100) < 2) {
-                g.speedX = Phaser.Math.Between(-2, 2) || 1;
-                g.speedY = Phaser.Math.Between(-2, 2) || 1;
-            }
         }
+
+        // Wall collision (guards)
+        walls.forEach(w => {
+            if (Phaser.Geom.Intersects.RectangleToRectangle(g.getBounds(), w.getBounds())) {
+                g.x = prevGX;
+                g.y = prevGY;
+                g.speedX *= -1;
+                g.speedY *= -1;
+            }
+        });
     });
 
-    // Suspicion decay
+    // Suspicion
     suspicion -= 0.1;
     suspicion = Phaser.Math.Clamp(suspicion, 0, 100);
 
-    // Change bar color dynamically
-    if (suspicion < 40) bar.fillColor = 0xffff00;
-    else if (suspicion < 80) bar.fillColor = 0xff8800;
-    else bar.fillColor = 0xff0000;
-
     bar.width = suspicion * 2;
 
-    // Alarm trigger
-    if (suspicion > 60 && !alarmTriggered && alarmSound) {
-        alarmSound.play();
-        alarmTriggered = true;
-    }
-
-    if (suspicion < 40 && alarmTriggered && alarmSound) {
-        alarmSound.stop();
-        alarmTriggered = false;
-    }
-
-    // Game over
     if (suspicion >= 100) {
-        if (alarmSound) alarmSound.stop();
         this.scene.start("GameOverScene");
     }
 
     // Reach server
-    if (player.x > 700 && player.y > 500) {
-        if (alarmSound) alarmSound.stop();
+    let distToServer = Phaser.Math.Distance.Between(player.x, player.y, this.server.x, this.server.y);
+
+    if (distToServer < 50) {
         this.scene.start("HackScene");
     }
 };
@@ -202,7 +212,6 @@ HackScene.prototype.create = function () {
 
     for (let i = 0; i < 3; i++) {
         let btn = this.add.rectangle(250 + i * 120, 300, 90, 90, 0x00ffcc)
-            .setStrokeStyle(3, 0xffffff)
             .setInteractive();
 
         btn.id = i;
@@ -228,18 +237,6 @@ HackScene.prototype.create = function () {
 
         buttons.push(btn);
     }
-
-    // Show sequence
-    this.time.delayedCall(500, () => {
-        sequence.forEach((val, index) => {
-            this.time.delayedCall(index * 600, () => {
-                buttons[val].setFillStyle(0xffff00);
-                this.time.delayedCall(300, () => {
-                    buttons[val].setFillStyle(0x00ffcc);
-                });
-            });
-        });
-    });
 };
 
 // ---------------- GAME OVER ----------------

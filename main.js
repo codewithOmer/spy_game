@@ -1,3 +1,9 @@
+//added Below is your complete updated main.js with:
+
+//✅ 3 guards
+//✅ Random movement (not just left-right)
+//✅ Detection from all guards
+//✅ Everything else intact
 const config = {
     type: Phaser.AUTO,
     width: 800,
@@ -16,8 +22,10 @@ MenuScene.prototype = Object.create(Phaser.Scene.prototype);
 MenuScene.prototype.create = function () {
     this.add.text(300, 200, "SPY HEIST", { fontSize: "40px", color: "#ffffff" });
 
-    let startBtn = this.add.text(330, 300, "START", { fontSize: "30px", backgroundColor: "#00ff00" })
-        .setInteractive();
+    let startBtn = this.add.text(330, 300, "START", { 
+        fontSize: "30px", 
+        backgroundColor: "#00ff00" 
+    }).setInteractive();
 
     startBtn.on("pointerdown", () => {
         this.scene.start("GameScene");
@@ -30,18 +38,35 @@ function GameScene() {
 }
 GameScene.prototype = Object.create(Phaser.Scene.prototype);
 
-let player, cursors, guard, suspicion = 0, bar;
+let player, cursors, guards = [], suspicion = 0, bar;
 
 GameScene.prototype.create = function () {
 
     // Player
     player = this.add.rectangle(100, 100, 30, 30, 0x00ff00);
 
-    // Guard
-    guard = this.add.rectangle(400, 300, 30, 30, 0xff0000);
-
     // Controls
     cursors = this.input.keyboard.createCursorKeys();
+
+    // Create 3 guards
+    guards = [];
+
+    for (let i = 0; i < 3; i++) {
+        let g = this.add.rectangle(
+            Phaser.Math.Between(100, 700),
+            Phaser.Math.Between(100, 500),
+            30, 30, 0xff0000
+        );
+
+        g.speedX = Phaser.Math.Between(-2, 2);
+        g.speedY = Phaser.Math.Between(-2, 2);
+
+        // avoid zero movement
+        if (g.speedX === 0) g.speedX = 1;
+        if (g.speedY === 0) g.speedY = 1;
+
+        guards.push(g);
+    }
 
     // Suspicion Bar
     bar = this.add.rectangle(100, 50, 200, 20, 0xff0000);
@@ -49,27 +74,47 @@ GameScene.prototype.create = function () {
 
 GameScene.prototype.update = function () {
 
-    // Movement
+    // Player Movement
     if (cursors.left.isDown) player.x -= 3;
     if (cursors.right.isDown) player.x += 3;
     if (cursors.up.isDown) player.y -= 3;
     if (cursors.down.isDown) player.y += 3;
 
-    // Guard simple movement
-    guard.x += Math.sin(this.time.now / 500) * 2;
+    // Guards Movement + Detection
+    guards.forEach(g => {
 
-    // Detection (distance check)
-    let dist = Phaser.Math.Distance.Between(player.x, player.y, guard.x, guard.y);
+        // Move
+        g.x += g.speedX;
+        g.y += g.speedY;
 
-    if (dist < 150) {
-        suspicion += 0.5;
-    } else {
-        suspicion -= 0.2;
-    }
+        // Bounce from walls
+        if (g.x < 0 || g.x > 800) g.speedX *= -1;
+        if (g.y < 0 || g.y > 600) g.speedY *= -1;
 
+        // Random direction change
+        if (Phaser.Math.Between(0, 100) < 2) {
+            g.speedX = Phaser.Math.Between(-2, 2);
+            g.speedY = Phaser.Math.Between(-2, 2);
+
+            if (g.speedX === 0) g.speedX = 1;
+            if (g.speedY === 0) g.speedY = 1;
+        }
+
+        // Detection
+        let dist = Phaser.Math.Distance.Between(player.x, player.y, g.x, g.y);
+
+        if (dist < 150) {
+            suspicion += 0.3;
+        }
+    });
+
+    // Reduce suspicion slowly
+    suspicion -= 0.1;
+
+    // Clamp value
     suspicion = Phaser.Math.Clamp(suspicion, 0, 100);
 
-    // Update bar
+    // Update UI bar
     bar.width = suspicion * 2;
 
     // Game Over
@@ -77,7 +122,7 @@ GameScene.prototype.update = function () {
         this.scene.start("GameOverScene");
     }
 
-    // Reach server → Hack scene
+    // Reach server → Hack
     if (player.x > 700 && player.y > 500) {
         this.scene.start("HackScene");
     }

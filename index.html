@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Spy Heist - Ultimate Map</title>
+    <title>Spy Heist - Final AI</title>
     <script src="https://unpkg.com/phaser@3/dist/phaser.js"></script>
 </head>
 <body style="margin:0">
@@ -19,19 +19,16 @@ class Game extends Phaser.Scene {
 
     create(){
 
-        // Focus fix
         this.input.keyboard.enabled = true;
         this.game.canvas.setAttribute('tabindex', '0');
         this.game.canvas.focus();
         this.input.on('pointerdown', () => this.game.canvas.focus());
 
-        // Background
         this.add.rectangle(400,300,800,600,0x2d2d2d);
 
         // PLAYER
         this.player = this.add.image(120,480,'player').setScale(0.5);
 
-        // Controls
         this.keys = this.input.keyboard.addKeys({
             up: Phaser.Input.Keyboard.KeyCodes.UP,
             down: Phaser.Input.Keyboard.KeyCodes.DOWN,
@@ -43,81 +40,83 @@ class Game extends Phaser.Scene {
             D: Phaser.Input.Keyboard.KeyCodes.D
         });
 
-        // SERVER (Security Room)
+        // SERVER
         this.server = this.add.image(400,520,'server').setScale(0.7);
 
-        //  WALLS (ALL WITH REAL GAPS)
+        // ROOMS
+        this.rooms = [
+            { x:150, y:100, w:250, h:180 },
+            { x:400, y:100, w:200, h:180 },
+            { x:650, y:100, w:250, h:180 },
+            { x:650, y:420, w:250, h:300 }
+        ];
+
+        // WALLS
         this.walls = [
 
-            // Outer walls
+            // Outer
             this.add.rectangle(400,20,760,40,0x888888),
             this.add.rectangle(400,580,760,40,0x888888),
             this.add.rectangle(20,300,40,560,0x888888),
             this.add.rectangle(780,300,40,560,0x888888),
 
-            //TOP DIVIDERS WITH VERTICAL DOORS
+            // Vertical room dividers (with door gaps)
             this.add.rectangle(300,80,40,80,0x888888),
             this.add.rectangle(300,200,40,80,0x888888),
-
             this.add.rectangle(500,80,40,80,0x888888),
             this.add.rectangle(500,200,40,80,0x888888),
 
-            // HALLWAY WALL WITH 3 DOORS
+            // Hallway walls (3 doors)
             this.add.rectangle(100,250,160,40,0x888888),
             this.add.rectangle(300,250,120,40,0x888888),
             this.add.rectangle(500,250,120,40,0x888888),
             this.add.rectangle(700,250,160,40,0x888888),
 
-            // Room 4 divider
+            // Side walls
             this.add.rectangle(600,400,40,300,0x888888),
-
-            // Lobby divider
             this.add.rectangle(250,400,40,300,0x888888),
 
-            // SECURITY ROOM WITH DOOR
+            // Security room
             this.add.rectangle(300,450,150,40,0x888888),
             this.add.rectangle(500,450,150,40,0x888888),
             this.add.rectangle(250,520,40,120,0x888888),
             this.add.rectangle(550,520,40,120,0x888888)
         ];
 
-        // DOOR VISUALS (ALL 6 DOORS)
-
-        // Horizontal hallway doors
+        // DOORS (visual only)
         this.add.rectangle(200,250,70,20,0x00ff00);
         this.add.rectangle(400,250,70,20,0x00ff00);
         this.add.rectangle(600,250,70,20,0x00ff00);
-
-        // Security room door
         this.add.rectangle(400,450,80,20,0x00ff00);
-
-        // NEW vertical doors (your white marks)
         this.add.rectangle(300,140,20,60,0x00ff00);
         this.add.rectangle(500,140,20,60,0x00ff00);
 
-        // Hide spots
+        // HIDE SPOTS
         this.hideSpots = [
             this.add.rectangle(180,500,60,60,0xaa7744),
             this.add.rectangle(650,420,60,60,0xaa7744),
             this.add.rectangle(600,120,60,60,0xaa7744)
         ];
 
-        // Guards
+        // GUARDS (1 per room)
         this.guards = [];
-        for(let i=0;i<3;i++){
+
+        this.rooms.forEach(room => {
+
             let g = this.add.image(
-                Phaser.Math.Between(200,650),
-                Phaser.Math.Between(100,450),
+                Phaser.Math.Between(room.x - room.w/2 + 40, room.x + room.w/2 - 40),
+                Phaser.Math.Between(room.y - room.h/2 + 40, room.y + room.h/2 - 40),
                 'guard'
             ).setScale(0.6);
 
+            g.room = room;
             g.speedX = Phaser.Math.Between(-2,2)||1;
             g.speedY = Phaser.Math.Between(-2,2)||1;
 
             this.guards.push(g);
-        }
+        });
 
-        // Suspicion bar
+        // Suspicion
         this.suspicion = 0;
         this.bar = this.add.rectangle(100,50,200,20,0xff0000);
     }
@@ -127,17 +126,16 @@ class Game extends Phaser.Scene {
         let prevX = this.player.x;
         let prevY = this.player.y;
 
-        // Movement
+        // PLAYER MOVEMENT
         if(this.keys.left.isDown || this.keys.A.isDown) this.player.x -= 3;
         if(this.keys.right.isDown || this.keys.D.isDown) this.player.x += 3;
         if(this.keys.up.isDown || this.keys.W.isDown) this.player.y -= 3;
         if(this.keys.down.isDown || this.keys.S.isDown) this.player.y += 3;
 
-        // Stay inside map
         this.player.x = Phaser.Math.Clamp(this.player.x, 40, 760);
         this.player.y = Phaser.Math.Clamp(this.player.y, 40, 560);
 
-        // Collision
+        // PLAYER COLLISION
         this.walls.forEach(w=>{
             let rect = new Phaser.Geom.Rectangle(
                 w.x-w.width/2,
@@ -154,35 +152,68 @@ class Game extends Phaser.Scene {
             }
         });
 
-        // Hiding
+        // HIDING
         let isHidden = false;
         this.hideSpots.forEach(h=>{
-            let dist = Phaser.Math.Distance.Between(
-                this.player.x,this.player.y,h.x,h.y
-            );
+            let dist = Phaser.Math.Distance.Between(this.player.x,this.player.y,h.x,h.y);
             if(dist < 70) isHidden = true;
         });
 
         this.player.setAlpha(isHidden ? 0.3 : 1);
 
-        // Guards
+        // GUARDS
         this.guards.forEach(g=>{
+
+            let prevX = g.x;
+            let prevY = g.y;
+
             g.x += g.speedX;
             g.y += g.speedY;
 
-            if(g.x<100||g.x>700) g.speedX*=-1;
-            if(g.y<100||g.y>500) g.speedY*=-1;
+            // Wall collision
+            this.walls.forEach(w=>{
+                let rect = new Phaser.Geom.Rectangle(
+                    w.x-w.width/2,
+                    w.y-w.height/2,
+                    w.width,
+                    w.height
+                );
 
+                if(Phaser.Geom.Intersects.RectangleToRectangle(
+                    g.getBounds(), rect
+                )){
+                    g.x = prevX;
+                    g.y = prevY;
+                    g.speedX *= -1;
+                    g.speedY *= -1;
+                }
+            });
+
+            // Stay inside room
+            let r = g.room;
+
+            let minX = r.x - r.w/2 + 30;
+            let maxX = r.x + r.w/2 - 30;
+            let minY = r.y - r.h/2 + 30;
+            let maxY = r.y + r.h/2 - 30;
+
+            if(g.x < minX || g.x > maxX) g.speedX *= -1;
+            if(g.y < minY || g.y > maxY) g.speedY *= -1;
+
+            g.x = Phaser.Math.Clamp(g.x, minX, maxX);
+            g.y = Phaser.Math.Clamp(g.y, minY, maxY);
+
+            // Detection
             let dist = Phaser.Math.Distance.Between(
                 this.player.x,this.player.y,g.x,g.y
             );
 
-            if(dist < 150 && !isHidden){
+            if(dist < 150 && this.player.alpha === 1){
                 this.suspicion += 0.5;
             }
         });
 
-        // Suspicion system
+        // Suspicion
         this.suspicion -= 0.1;
         this.suspicion = Phaser.Math.Clamp(this.suspicion,0,100);
         this.bar.width = this.suspicion * 2;
@@ -192,7 +223,7 @@ class Game extends Phaser.Scene {
             location.reload();
         }
 
-        // Win condition
+        // WIN
         let d = Phaser.Math.Distance.Between(
             this.player.x,this.player.y,
             this.server.x,this.server.y

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Spy Heist - Stealth Upgrade</title>
+    <title>Spy Heist - Final AI</title>
     <script src="https://unpkg.com/phaser@3/dist/phaser.js"></script>
 </head>
 <body style="margin:0">
@@ -19,6 +19,7 @@ class Game extends Phaser.Scene {
 
     create(){
 
+        // Focus fix
         this.input.keyboard.enabled = true;
         this.game.canvas.setAttribute('tabindex', '0');
         this.game.canvas.focus();
@@ -43,12 +44,16 @@ class Game extends Phaser.Scene {
         // SERVER
         this.server = this.add.image(400,520,'server').setScale(0.7);
 
+        // BUTTON
+        this.button = this.add.rectangle(720,520,40,40,0x00ffff);
+        this.doorOpen = false;
+
         // ROOMS
         this.rooms = [
-            { x:150, y:100, w:250, h:180 },
-            { x:400, y:100, w:200, h:180 },
-            { x:650, y:100, w:250, h:180 },
-            { x:650, y:420, w:250, h:300 }
+            { x:150, y:150, w:250, h:200 },
+            { x:400, y:150, w:200, h:200 },
+            { x:650, y:150, w:250, h:200 },
+            { x:650, y:450, w:250, h:250 }
         ];
 
         // WALLS
@@ -69,34 +74,43 @@ class Game extends Phaser.Scene {
             this.add.rectangle(500,250,120,40,0x888888),
             this.add.rectangle(700,250,160,40,0x888888),
 
-            this.add.rectangle(600,400,40,300,0x888888),
-            this.add.rectangle(250,400,40,300,0x888888),
+            this.add.rectangle(300,400,40,300,0x888888),
+            this.add.rectangle(520,400,40,300,0x888888),
 
-            this.add.rectangle(300,450,150,40,0x888888),
-            this.add.rectangle(500,450,150,40,0x888888),
             this.add.rectangle(250,520,40,120,0x888888),
             this.add.rectangle(550,520,40,120,0x888888)
         ];
 
-        // DOORS
+        // SECURITY DOOR
+        this.securityDoor = this.add.rectangle(400,450,200,40,0xff0000);
+
+        // VISUAL DOORS
         this.add.rectangle(200,250,70,20,0x00ff00);
         this.add.rectangle(400,250,70,20,0x00ff00);
         this.add.rectangle(600,250,70,20,0x00ff00);
-        this.add.rectangle(400,450,80,20,0x00ff00);
         this.add.rectangle(300,140,20,60,0x00ff00);
         this.add.rectangle(500,140,20,60,0x00ff00);
 
-        // HIDE SPOTS (with small one)
-        this.hideSpots = [
-            this.add.rectangle(180,500,60,60,0xaa7744),
-            this.add.rectangle(650,420,60,60,0xaa7744),
-            this.add.rectangle(600,120,60,60,0xaa7744),
+        // ✅ AUTO HIDE SPOTS (1 per room)
+        this.hideSpots = [];
 
-            //  SMALL HIDE SPOT
-            this.add.rectangle(350,320,30,30,0x996633)
-        ];
+        this.rooms.forEach(room => {
 
-        // GUARDS (slower)
+            let hx = Phaser.Math.Between(
+                room.x - room.w/2 + 40,
+                room.x + room.w/2 - 40
+            );
+
+            let hy = Phaser.Math.Between(
+                room.y - room.h/2 + 40,
+                room.y + room.h/2 - 40
+            );
+
+            let hide = this.add.rectangle(hx, hy, 50, 50, 0xaa7744);
+            this.hideSpots.push(hide);
+        });
+
+        // GUARDS
         this.guards = [];
 
         this.rooms.forEach(room => {
@@ -108,8 +122,6 @@ class Game extends Phaser.Scene {
             ).setScale(0.6);
 
             g.room = room;
-
-            // SLOWER SPEED
             g.speedX = Phaser.Math.Between(-1,1) || 0.5;
             g.speedY = Phaser.Math.Between(-1,1) || 0.5;
 
@@ -125,16 +137,16 @@ class Game extends Phaser.Scene {
         let prevX = this.player.x;
         let prevY = this.player.y;
 
-        // PLAYER MOVEMENT
+        // MOVE
         if(this.keys.left.isDown || this.keys.A.isDown) this.player.x -= 3;
         if(this.keys.right.isDown || this.keys.D.isDown) this.player.x += 3;
         if(this.keys.up.isDown || this.keys.W.isDown) this.player.y -= 3;
         if(this.keys.down.isDown || this.keys.S.isDown) this.player.y += 3;
 
-        this.player.x = Phaser.Math.Clamp(this.player.x, 40, 760);
-        this.player.y = Phaser.Math.Clamp(this.player.y, 40, 560);
+        this.player.x = Phaser.Math.Clamp(this.player.x,40,760);
+        this.player.y = Phaser.Math.Clamp(this.player.y,40,560);
 
-        // PLAYER COLLISION
+        // WALL COLLISION
         this.walls.forEach(w=>{
             let rect = new Phaser.Geom.Rectangle(
                 w.x-w.width/2,
@@ -151,17 +163,46 @@ class Game extends Phaser.Scene {
             }
         });
 
-        // IMPROVED HIDING (dynamic size)
+        // BUTTON
+        let dBtn = Phaser.Math.Distance.Between(
+            this.player.x,this.player.y,
+            this.button.x,this.button.y
+        );
+
+        if(dBtn < 40){
+            this.doorOpen = true;
+        }
+
+        // DOOR COLLISION
+        if(!this.doorOpen){
+            let rect = new Phaser.Geom.Rectangle(
+                this.securityDoor.x - this.securityDoor.width/2,
+                this.securityDoor.y - this.securityDoor.height/2,
+                this.securityDoor.width,
+                this.securityDoor.height
+            );
+
+            if(Phaser.Geom.Intersects.RectangleToRectangle(
+                this.player.getBounds(), rect
+            )){
+                this.player.x = prevX;
+                this.player.y = prevY;
+            }
+        }
+
+        if(this.doorOpen){
+            this.securityDoor.fillColor = 0x00ff00;
+            this.securityDoor.setAlpha(0.3);
+        }
+
+        // HIDING
         let isHidden = false;
 
         this.hideSpots.forEach(h=>{
             let dist = Phaser.Math.Distance.Between(
                 this.player.x,this.player.y,h.x,h.y
             );
-
-            let radius = h.width / 2 + 10;
-
-            if(dist < radius) isHidden = true;
+            if(dist < h.width/2) isHidden = true;
         });
 
         this.player.setAlpha(isHidden ? 0.3 : 1);
@@ -169,13 +210,13 @@ class Game extends Phaser.Scene {
         // GUARDS
         this.guards.forEach(g=>{
 
-            let prevX = g.x;
-            let prevY = g.y;
+            let prevGX = g.x;
+            let prevGY = g.y;
 
             g.x += g.speedX;
             g.y += g.speedY;
 
-            // Wall collision
+            // WALL COLLISION
             this.walls.forEach(w=>{
                 let rect = new Phaser.Geom.Rectangle(
                     w.x-w.width/2,
@@ -187,38 +228,45 @@ class Game extends Phaser.Scene {
                 if(Phaser.Geom.Intersects.RectangleToRectangle(
                     g.getBounds(), rect
                 )){
-                    g.x = prevX;
-                    g.y = prevY;
+                    g.x = prevGX;
+                    g.y = prevGY;
                     g.speedX *= -1;
                     g.speedY *= -1;
                 }
             });
 
-            // Stay in room
+            // ROOM LIMIT
             let r = g.room;
 
-            let minX = r.x - r.w/2 + 30;
-            let maxX = r.x + r.w/2 - 30;
-            let minY = r.y - r.h/2 + 30;
-            let maxY = r.y + r.h/2 - 30;
+            if(g.x < r.x - r.w/2 || g.x > r.x + r.w/2){
+                g.speedX *= -1;
+            }
 
-            if(g.x < minX || g.x > maxX) g.speedX *= -1;
-            if(g.y < minY || g.y > maxY) g.speedY *= -1;
+            if(g.y < r.y - r.h/2 || g.y > r.y + r.h/2){
+                g.speedY *= -1;
+            }
 
-            g.x = Phaser.Math.Clamp(g.x, minX, maxX);
-            g.y = Phaser.Math.Clamp(g.y, minY, maxY);
-
-            // Detection (slightly reduced range)
+            // DETECTION
             let dist = Phaser.Math.Distance.Between(
                 this.player.x,this.player.y,g.x,g.y
             );
 
             if(dist < 120 && this.player.alpha === 1){
-                this.suspicion += 0.5;
+                this.suspicion += 0.4;
             }
+
+            // 🚨 NEW: TOUCH = INSTANT CAUGHT
+            if (Phaser.Geom.Intersects.RectangleToRectangle(
+                this.player.getBounds(),
+                g.getBounds()
+            )) {
+                alert("CAUGHT BY GUARD!");
+                location.reload();
+            }
+
         });
 
-        // Suspicion
+        // SUSPICION
         this.suspicion -= 0.1;
         this.suspicion = Phaser.Math.Clamp(this.suspicion,0,100);
         this.bar.width = this.suspicion * 2;
@@ -235,22 +283,19 @@ class Game extends Phaser.Scene {
         );
 
         if(d < 50){
-            alert("SECURITY HACKED! MISSION COMPLETE");
+            alert("MISSION COMPLETE!");
             location.reload();
         }
     }
 }
 
-const config = {
+new Phaser.Game({
     type: Phaser.AUTO,
     width: 800,
     height: 600,
     scene: Game
-};
-
-new Phaser.Game(config);
+});
 
 </script>
-
 </body>
 </html>

@@ -96,7 +96,7 @@ class Game extends Phaser.Scene {
             }
         });
 
-        // 🟫 HIDING CHECK
+        // HIDING CHECK
         let isHidden = false;
         this.hideSpots.forEach(h=>{
             let dist = Phaser.Math.Distance.Between(

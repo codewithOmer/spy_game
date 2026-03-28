@@ -19,20 +19,44 @@ class Game extends Phaser.Scene {
 
     create(){
 
+        // 🎮 DIFFICULTY SELECT
+        this.difficulty = prompt("Choose difficulty: easy / medium / hard");
+        if(!this.difficulty) this.difficulty = "medium";
+        this.difficulty = this.difficulty.toLowerCase();
+
+        // 🎯 DIFFICULTY SETTINGS
+        if(this.difficulty === "easy"){
+            this.guardSpeed = 1.2;
+            this.detectMultiplier = 0.6;
+            this.maxDetections = 7;
+            this.visionRange = 120;
+        }
+        else if(this.difficulty === "hard"){
+            this.guardSpeed = 2.5;
+            this.detectMultiplier = 1.5;
+            this.maxDetections = 3;
+            this.visionRange = 200;
+        }
+        else {
+            this.guardSpeed = 1.8;
+            this.detectMultiplier = 1;
+            this.maxDetections = 5;
+            this.visionRange = 150;
+        }
+
         this.input.keyboard.enabled = true;
         this.game.canvas.setAttribute('tabindex', '0');
         this.game.canvas.focus();
         this.input.on('pointerdown', () => this.game.canvas.focus());
 
-        // GRID FLOOR
+        // GRID
         for(let x=0; x<800; x+=40){
             for(let y=0; y<600; y+=40){
                 this.add.rectangle(x, y, 38, 38, 0x3a3a3a).setOrigin(0);
             }
         }
 
-        this.player = this.add.image(120,480,'player').setScale(0.5);
-        this.player.setTint(0x00ffff);
+        this.player = this.add.image(120,480,'player').setScale(0.5).setTint(0x00ffff);
 
         this.keys = this.input.keyboard.addKeys({
             up: Phaser.Input.Keyboard.KeyCodes.UP,
@@ -49,12 +73,8 @@ class Game extends Phaser.Scene {
 
         this.alerted = false;
 
-        // DETECTION COUNT
         this.detectCount = 0;
-        this.detectText = this.add.text(50, 100, "Spotted: 0 / 5", {
-            fontSize: "18px",
-            color: "#ffaaaa"
-        });
+        this.detectText = this.add.text(50, 100, "", {fontSize:"18px",color:"#ffaaaa"});
 
         // ROOMS
         this.rooms = [
@@ -64,9 +84,8 @@ class Game extends Phaser.Scene {
             { x:650, y:450, w:250, h:250 }
         ];
 
-        // ROOM VISUALS
-        this.rooms.forEach(room=>{
-            this.add.rectangle(room.x, room.y, room.w, room.h, 0x444444).setAlpha(0.4);
+        this.rooms.forEach(r=>{
+            this.add.rectangle(r.x,r.y,r.w,r.h,0x444444).setAlpha(0.4);
         });
 
         // WALLS
@@ -128,11 +147,7 @@ class Game extends Phaser.Scene {
         this.suspicion = 0;
 
         this.bar = this.add.rectangle(100,50,200,20,0xff0000);
-
-        this.suspicionText = this.add.text(50,70,"Suspicion: 0%",{
-            fontSize:"18px",
-            color:"#ffffff"
-        });
+        this.suspicionText = this.add.text(50,70,"Suspicion: 0%",{fontSize:"18px",color:"#fff"});
     }
 
     update(){
@@ -171,7 +186,9 @@ class Game extends Phaser.Scene {
 
             let dist = Phaser.Math.Distance.Between(this.player.x,this.player.y,g.x,g.y);
 
-            let detectRange = this.alerted ? 220 : 140;
+            let baseRange = this.alerted ? 220 : 140;
+            let detectRange = this.visionRange || baseRange;
+
             let detectRate = this.alerted ? 1.4 : 0.7;
 
             // VISION DRAW
@@ -183,24 +200,21 @@ class Game extends Phaser.Scene {
             g.vision.closePath();
             g.vision.fillPath();
 
-            // VISION CHECK
             let angleToPlayer = Phaser.Math.Angle.Between(g.x,g.y,this.player.x,this.player.y);
             let angleDiff = Phaser.Math.Angle.Wrap(angleToPlayer - g.angleFacing);
             let inVision = Math.abs(angleDiff) < 0.6;
 
             if(dist < detectRange && inVision && this.player.alpha === 1){
 
-                g.suspicion += detectRate;
-                this.suspicion += detectRate * 0.3;
+                g.suspicion += detectRate * this.detectMultiplier;
+                this.suspicion += detectRate * 0.3 * this.detectMultiplier;
 
-                // DETECTION COUNT
                 if(!g.hasSeenPlayer){
                     g.hasSeenPlayer = true;
                     this.detectCount++;
                 }
             }
 
-            // RESET DETECTION FLAG
             if(dist > detectRange || this.player.alpha !== 1){
                 g.hasSeenPlayer = false;
             }
@@ -219,8 +233,8 @@ class Game extends Phaser.Scene {
 
             if(g.chasing){
                 g.angleFacing = Phaser.Math.Angle.Between(g.x,g.y,this.player.x,this.player.y);
-                g.x += Math.cos(g.angleFacing)*2.5;
-                g.y += Math.sin(g.angleFacing)*2.5;
+                g.x += Math.cos(g.angleFacing)*this.guardSpeed;
+                g.y += Math.sin(g.angleFacing)*this.guardSpeed;
 
             } else if(g.returning){
 
@@ -245,7 +259,6 @@ class Game extends Phaser.Scene {
                 if(g.y < r.y-r.h/2 || g.y > r.y+r.h/2) g.speedY *= -1;
             }
 
-            // TOUCH = CAUGHT
             if(Phaser.Geom.Intersects.RectangleToRectangle(this.player.getBounds(),g.getBounds())){
                 alert("CAUGHT!");
                 location.reload();
@@ -259,16 +272,13 @@ class Game extends Phaser.Scene {
         this.bar.width = this.suspicion*2;
         this.suspicionText.setText("Suspicion: "+Math.floor(this.suspicion)+"%");
 
-        // UPDATE DETECT TEXT
-        this.detectText.setText("Spotted: " + this.detectCount + " / 5");
+        this.detectText.setText("Spotted: " + this.detectCount + " / " + this.maxDetections);
 
-        // LOSE CONDITION
-        if(this.detectCount >= 5){
+        if(this.detectCount >= this.maxDetections){
             alert("CAUGHT! Too many detections!");
             location.reload();
         }
 
-        // ALERT SYSTEM
         if(this.suspicion > 50 && !this.alerted){
             this.alerted = true;
             this.alertText = this.add.text(300,100,"ALERT!",{fontSize:"32px",color:"#ff0000"});
@@ -279,7 +289,6 @@ class Game extends Phaser.Scene {
             if(this.alertText) this.alertText.destroy();
         }
 
-        // WIN
         let d = Phaser.Math.Distance.Between(this.player.x,this.player.y,this.server.x,this.server.y);
         if(d < 50){
             alert("MISSION COMPLETE!");

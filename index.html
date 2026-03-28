@@ -48,6 +48,9 @@ class Game extends Phaser.Scene {
         this.button = this.add.rectangle(720,520,40,40,0x00ffff);
         this.doorOpen = false;
 
+        // ALERT SYSTEM
+        this.alerted = false;
+
         // ROOMS
         this.rooms = [
             { x:150, y:150, w:250, h:200 },
@@ -91,7 +94,7 @@ class Game extends Phaser.Scene {
         this.add.rectangle(300,140,20,60,0x00ff00);
         this.add.rectangle(500,140,20,60,0x00ff00);
 
-        // ✅ AUTO HIDE SPOTS (1 per room)
+        // AUTO HIDE SPOTS
         this.hideSpots = [];
 
         this.rooms.forEach(room => {
@@ -129,7 +132,15 @@ class Game extends Phaser.Scene {
         });
 
         this.suspicion = 0;
+
+        // BAR
         this.bar = this.add.rectangle(100,50,200,20,0xff0000);
+
+        //TEXT
+        this.suspicionText = this.add.text(50, 70, "Suspicion: 0%", {
+            fontSize: "18px",
+            color: "#ffffff"
+        });
     }
 
     update(){
@@ -246,16 +257,19 @@ class Game extends Phaser.Scene {
                 g.speedY *= -1;
             }
 
-            // DETECTION
+            // DETECTION (smarter)
             let dist = Phaser.Math.Distance.Between(
                 this.player.x,this.player.y,g.x,g.y
             );
 
-            if(dist < 120 && this.player.alpha === 1){
-                this.suspicion += 0.4;
+            let detectRange = this.alerted ? 180 : 120;
+            let detectRate = this.alerted ? 0.8 : 0.4;
+
+            if(dist < detectRange && this.player.alpha === 1){
+                this.suspicion += detectRate;
             }
 
-            // 🚨 NEW: TOUCH = INSTANT CAUGHT
+            //  TOUCH = INSTANT CAUGHT
             if (Phaser.Geom.Intersects.RectangleToRectangle(
                 this.player.getBounds(),
                 g.getBounds()
@@ -266,11 +280,32 @@ class Game extends Phaser.Scene {
 
         });
 
-        // SUSPICION
+        // SUSPICION UPDATE
         this.suspicion -= 0.1;
         this.suspicion = Phaser.Math.Clamp(this.suspicion,0,100);
+
         this.bar.width = this.suspicion * 2;
 
+        //  TEXT UPDATE
+        this.suspicionText.setText("Suspicion: " + Math.floor(this.suspicion) + "%");
+
+        // 🚨 ALERT SYSTEM
+        if (this.suspicion > 50 && !this.alerted) {
+
+            this.alerted = true;
+
+            this.guards.forEach(g => {
+                g.speedX *= 2;
+                g.speedY *= 2;
+            });
+
+            this.add.text(300, 100, "ALERT!", {
+                fontSize: "32px",
+                color: "#ff0000"
+            });
+        }
+
+        // GAME OVER
         if(this.suspicion >= 100){
             alert("CAUGHT!");
             location.reload();

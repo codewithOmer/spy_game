@@ -94,9 +94,8 @@ class Game extends Phaser.Scene {
         this.add.rectangle(300,140,20,60,0x00ff00);
         this.add.rectangle(500,140,20,60,0x00ff00);
 
-        // AUTO HIDE SPOTS
+        // HIDE SPOTS
         this.hideSpots = [];
-
         this.rooms.forEach(room => {
 
             let hx = Phaser.Math.Between(
@@ -128,15 +127,17 @@ class Game extends Phaser.Scene {
             g.speedX = Phaser.Math.Between(-1,1) || 0.5;
             g.speedY = Phaser.Math.Between(-1,1) || 0.5;
 
+            //  INDIVIDUAL AI
+            g.suspicion = 0;
+            g.chasing = false;
+
             this.guards.push(g);
         });
 
         this.suspicion = 0;
 
-        // BAR
         this.bar = this.add.rectangle(100,50,200,20,0xff0000);
 
-        //TEXT
         this.suspicionText = this.add.text(50, 70, "Suspicion: 0%", {
             fontSize: "18px",
             color: "#ffffff"
@@ -208,7 +209,6 @@ class Game extends Phaser.Scene {
 
         // HIDING
         let isHidden = false;
-
         this.hideSpots.forEach(h=>{
             let dist = Phaser.Math.Distance.Between(
                 this.player.x,this.player.y,h.x,h.y
@@ -224,52 +224,66 @@ class Game extends Phaser.Scene {
             let prevGX = g.x;
             let prevGY = g.y;
 
-            g.x += g.speedX;
-            g.y += g.speedY;
-
-            // WALL COLLISION
-            this.walls.forEach(w=>{
-                let rect = new Phaser.Geom.Rectangle(
-                    w.x-w.width/2,
-                    w.y-w.height/2,
-                    w.width,
-                    w.height
-                );
-
-                if(Phaser.Geom.Intersects.RectangleToRectangle(
-                    g.getBounds(), rect
-                )){
-                    g.x = prevGX;
-                    g.y = prevGY;
-                    g.speedX *= -1;
-                    g.speedY *= -1;
-                }
-            });
-
-            // ROOM LIMIT
-            let r = g.room;
-
-            if(g.x < r.x - r.w/2 || g.x > r.x + r.w/2){
-                g.speedX *= -1;
-            }
-
-            if(g.y < r.y - r.h/2 || g.y > r.y + r.h/2){
-                g.speedY *= -1;
-            }
-
-            // DETECTION (smarter)
             let dist = Phaser.Math.Distance.Between(
                 this.player.x,this.player.y,g.x,g.y
             );
 
-            let detectRange = this.alerted ? 180 : 120;
-            let detectRate = this.alerted ? 0.8 : 0.4;
+            let detectRange = this.alerted ? 200 : 120;
+            let detectRate = this.alerted ? 1.0 : 0.5;
 
             if(dist < detectRange && this.player.alpha === 1){
-                this.suspicion += detectRate;
+                g.suspicion += detectRate;
+                this.suspicion += detectRate * 0.3;
             }
 
-            //  TOUCH = INSTANT CAUGHT
+            // decrease
+            g.suspicion -= 0.2;
+            g.suspicion = Phaser.Math.Clamp(g.suspicion, 0, 100);
+
+            // CHASE
+            if(g.suspicion > 90) g.chasing = true;
+            if(g.suspicion < 40) g.chasing = false;
+
+            if(g.chasing){
+                let angle = Phaser.Math.Angle.Between(g.x, g.y, this.player.x, this.player.y);
+                g.x += Math.cos(angle) * 2.5;
+                g.y += Math.sin(angle) * 2.5;
+            } else {
+                g.x += g.speedX;
+                g.y += g.speedY;
+
+                // WALL COLLISION
+                this.walls.forEach(w=>{
+                    let rect = new Phaser.Geom.Rectangle(
+                        w.x-w.width/2,
+                        w.y-w.height/2,
+                        w.width,
+                        w.height
+                    );
+
+                    if(Phaser.Geom.Intersects.RectangleToRectangle(
+                        g.getBounds(), rect
+                    )){
+                        g.x = prevGX;
+                        g.y = prevGY;
+                        g.speedX *= -1;
+                        g.speedY *= -1;
+                    }
+                });
+
+                // ROOM LIMIT
+                let r = g.room;
+
+                if(g.x < r.x - r.w/2 || g.x > r.x + r.w/2){
+                    g.speedX *= -1;
+                }
+
+                if(g.y < r.y - r.h/2 || g.y > r.y + r.h/2){
+                    g.speedY *= -1;
+                }
+            }
+
+            // TOUCH = CAUGHT
             if (Phaser.Geom.Intersects.RectangleToRectangle(
                 this.player.getBounds(),
                 g.getBounds()
@@ -280,16 +294,14 @@ class Game extends Phaser.Scene {
 
         });
 
-        // SUSPICION UPDATE
+        // GLOBAL SUSPICION
         this.suspicion -= 0.1;
         this.suspicion = Phaser.Math.Clamp(this.suspicion,0,100);
 
         this.bar.width = this.suspicion * 2;
-
-        //  TEXT UPDATE
         this.suspicionText.setText("Suspicion: " + Math.floor(this.suspicion) + "%");
 
-        // 🚨 ALERT SYSTEM
+        // ALERT ON
         if (this.suspicion > 50 && !this.alerted) {
 
             this.alerted = true;
@@ -299,10 +311,25 @@ class Game extends Phaser.Scene {
                 g.speedY *= 2;
             });
 
-            this.add.text(300, 100, "ALERT!", {
+            this.alertText = this.add.text(300, 100, "ALERT!", {
                 fontSize: "32px",
                 color: "#ff0000"
             });
+        }
+
+        // ALERT OFF
+        if (this.suspicion < 20 && this.alerted) {
+
+            this.alerted = false;
+
+            this.guards.forEach(g => {
+                g.speedX *= 0.5;
+                g.speedY *= 0.5;
+            });
+
+            if(this.alertText){
+                this.alertText.destroy();
+            }
         }
 
         // GAME OVER
